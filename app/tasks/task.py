@@ -1,10 +1,9 @@
 import os
-import pandas as pd
 from tabula import read_pdf
 from app.celery import celery
 
 
-# @celery.task
+@celery.task(name='parse_pdf_task')
 def parse_pdf_task(pdf_path, folder_path):
     try:
         data = read_pdf(pdf_path, stream=True, pages='all')

@@ -31,7 +31,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: celery_worker
-    command: celery -A app.celery worker --loglevel=info 
+    command: celery -A app.tasks.task worker --loglevel=info 
     depends_on:
       - redis  
     restart: always
