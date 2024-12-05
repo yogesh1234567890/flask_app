@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pdf-table-extractor
+    ports:
+      - "5001:5002"
+    volumes:
+      - .:/app               
+      - ./static:/app/static 
+      - /app/__pycache__/    
+    environment:
+      - FLASK_ENV=development
+    command: python run.py   
+    depends_on:
+      - redis
+    restart: always
+
+  redis:
+    image: redis:6.2-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery_worker
+    command: celery -A app.celery worker --loglevel=info 
+    depends_on:
+      - redis  
+    restart: always
+    volumes:
+      - .:/app  
+

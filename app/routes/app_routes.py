@@ -1,7 +1,9 @@
 import os
 import uuid
+import time
 
 from flask import Blueprint, request, jsonify
+from app.tasks.task import parse_pdf_task
 
 app_routes = Blueprint('users', __name__)
 UPLOAD_FOLDER='static/uploads'
@@ -15,16 +17,13 @@ def process_file():
     if pdf_file.filename == '':
         return jsonify({'error': 'No file selected'}), 400
 
-    # Generate unique ID
-    unique_id = str(uuid.uuid4())
+    unique_id = f"{uuid.uuid4().hex[:8]}{int(time.time())}"
     folder_path = os.path.join(UPLOAD_FOLDER, unique_id)
     os.makedirs(folder_path, exist_ok=True)
 
-    # Save PDF to the folder
     pdf_path = os.path.join(folder_path, pdf_file.filename)
     pdf_file.save(pdf_path)
 
-    # # Start background processing
-    # parse_pdf_task.delay(pdf_path, folder_path)
+    parse_pdf_task(pdf_path, folder_path)
 
     return jsonify({'message': 'File uploaded', 'id': unique_id}), 202
