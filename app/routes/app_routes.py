@@ -2,8 +2,10 @@ import os
 import uuid
 import time
 import csv
+from celery.result import AsyncResult
+from flask import jsonify, abort
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, abort
 from app.tasks.task import parse_pdf_task
 
 app_routes = Blueprint('users', __name__)
@@ -12,11 +14,11 @@ UPLOAD_FOLDER='static/uploads'
 @app_routes.route('/upload', methods=['POST'])
 def process_file():
     if 'file' not in request.files:
-        return jsonify({'error': 'No file provided'}), 400
+        abort(400, description="No file provided")
 
     pdf_file = request.files['file']
     if pdf_file.filename == '':
-        return jsonify({'error': 'No file selected'}), 400
+        abort(400, description="No file selected")
 
     unique_id = f"{uuid.uuid4().hex[:8]}{int(time.time())}"
     folder_path = os.path.join(UPLOAD_FOLDER, unique_id)
@@ -31,25 +33,53 @@ def process_file():
 
 @app_routes.route('/status/<string:task_id>', methods=['GET'])
 def get_status(task_id):
-    code_path = os.path.join(UPLOAD_FOLDER, task_id)
-    if not os.path.exists(code_path):
-        return jsonify({'error': 'Task not found'}), 404
-    
-    if os.path.exists(os.path.join(code_path, 'error_log.txt')):
-        with open(os.path.join(code_path, 'error_log.txt'), 'r') as f:
-            error_message = f.read()
-        return jsonify({'status': 'failed', 'error': error_message}), 200
-    
-    elif os.path.exists(code_path):
-        csv_files = [f for f in os.listdir(code_path) if f.endswith('.csv')]
-        data = {}
-        for csv_file in csv_files:
-            csv_file_path = os.path.join(code_path, csv_file)
+    try:
+        result = AsyncResult(task_id)
+        if result.status == 'PENDING' or result.status == 'STARTED':
+            return jsonify({'status': 'In progress'}), 200
 
-            with open(csv_file_path, 'r') as f:
-                reader = csv.DictReader(f)  
-                data[csv_file] = [row for row in reader]  
+        if result.status == 'SUCCESS':
+            task_folder_path = os.path.join(UPLOAD_FOLDER, task_id)
+            if os.path.exists(task_folder_path):
+                csv_files = [f for f in os.listdir(task_folder_path) if f.endswith('.csv')]
+                data = {}
+                for csv_file in csv_files:
+                    csv_file_path = os.path.join(task_folder_path, csv_file)
+                    with open(csv_file_path, 'r') as f:
+                        reader = csv.DictReader(f)
+                        data[csv_file] = [row for row in reader]
+                return jsonify({'status': 'SUCCESS', 'data': data}), 200
+            return jsonify({'status': 'SUCCESS', 'data': 'No files found'}), 200
 
-        return jsonify({'status': 'completed', 'data': data}), 200
-    else:
-        return jsonify({'status': 'pending'}), 200
+        if result.status == 'FAILURE':
+            task_folder_path = os.path.join(UPLOAD_FOLDER, task_id)
+            error_log_path = os.path.join(task_folder_path, 'error_log.txt')
+            if os.path.exists(error_log_path):
+                with open(error_log_path, 'r') as f:
+                    error_message = f.read()
+                return jsonify({'status': 'FAILED', 'error': error_message}), 200
+
+            return jsonify({'status': 'FAILED', 'error': 'Task failed but no error log found'}), 200
+
+    except Exception as e:
+        print(f"Error checking Celery task: {e}")
+
+    task_folder_path = os.path.join(UPLOAD_FOLDER, task_id)
+    if os.path.exists(task_folder_path):
+        csv_files = [f for f in os.listdir(task_folder_path) if f.endswith('.csv')]
+        if csv_files:
+            data = {}
+            for csv_file in csv_files:
+                csv_file_path = os.path.join(task_folder_path, csv_file)
+                with open(csv_file_path, 'r') as f:
+                    reader = csv.DictReader(f)
+                    data[csv_file] = [row for row in reader]
+            return jsonify({'status': 'SUCCESS', 'data': data}), 200
+
+        error_log_path = os.path.join(task_folder_path, 'error_log.txt')
+        if os.path.exists(error_log_path):
+            with open(error_log_path, 'r') as f:
+                error_message = f.read()
+            return jsonify({'status': 'FAILED', 'error': error_message}), 200
+
+    return jsonify({'status': 'UNKNOWN', 'error': 'Task ID does not exist and no files found'}), 404

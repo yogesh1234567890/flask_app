@@ -11,9 +11,10 @@ services:
     volumes:
       - .:/app               
       - ./static:/app/static 
-      - /app/__pycache__/    
     environment:
       - FLASK_ENV=development
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     command: python run.py   
     depends_on:
       - redis
@@ -34,7 +35,9 @@ services:
     command: celery -A app.tasks.task worker --loglevel=info 
     depends_on:
       - redis  
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0 
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     restart: always
     volumes:
-      - .:/app  
-
+      - .:/app
