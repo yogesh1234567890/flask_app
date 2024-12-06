@@ -35,22 +35,30 @@ def process_file():
 def get_status(task_id):
     try:
         result = AsyncResult(task_id)
-        if result.status == 'PENDING' or result.status == 'STARTED':
+        # Check if task is pending and not found
+        if result.status == 'PENDING' and not result.result:
+            return jsonify({'status': 'UNKNOWN', 'error': 'Task ID does not exist'}), 404
+
+        # Check if task is in progress
+        if result.status in ['PENDING', 'STARTED']:
             return jsonify({'status': 'In progress'}), 200
 
+        # Check if task was successful
         if result.status == 'SUCCESS':
             task_folder_path = os.path.join(UPLOAD_FOLDER, task_id)
             if os.path.exists(task_folder_path):
                 csv_files = [f for f in os.listdir(task_folder_path) if f.endswith('.csv')]
-                data = {}
-                for csv_file in csv_files:
-                    csv_file_path = os.path.join(task_folder_path, csv_file)
-                    with open(csv_file_path, 'r') as f:
-                        reader = csv.DictReader(f)
-                        data[csv_file] = [row for row in reader]
-                return jsonify({'status': 'SUCCESS', 'data': data}), 200
-            return jsonify({'status': 'SUCCESS', 'data': 'No files found'}), 200
+                if csv_files:
+                    data = {}
+                    for csv_file in csv_files:
+                        csv_file_path = os.path.join(task_folder_path, csv_file)
+                        with open(csv_file_path, 'r') as f:
+                            reader = csv.DictReader(f)
+                            data[csv_file] = [row for row in reader]
+                    return jsonify({'status': 'SUCCESS', 'data': data}), 200
+                return jsonify({'status': 'SUCCESS', 'data': 'No files found'}), 200
 
+        # Check if task failed
         if result.status == 'FAILURE':
             task_folder_path = os.path.join(UPLOAD_FOLDER, task_id)
             error_log_path = os.path.join(task_folder_path, 'error_log.txt')
@@ -64,6 +72,7 @@ def get_status(task_id):
     except Exception as e:
         print(f"Error checking Celery task: {e}")
 
+    # If no result or error log found, check for task folder
     task_folder_path = os.path.join(UPLOAD_FOLDER, task_id)
     if os.path.exists(task_folder_path):
         csv_files = [f for f in os.listdir(task_folder_path) if f.endswith('.csv')]
@@ -76,6 +85,7 @@ def get_status(task_id):
                     data[csv_file] = [row for row in reader]
             return jsonify({'status': 'SUCCESS', 'data': data}), 200
 
+        # Check for error log if no CSV files found
         error_log_path = os.path.join(task_folder_path, 'error_log.txt')
         if os.path.exists(error_log_path):
             with open(error_log_path, 'r') as f:
