@@ -1,0 +1,76 @@
+swagger: "2.0"
+info:
+  title: "File Processing API"
+  version: "1.0.0"
+basePath: "/"
+schemes:
+  - "http"
+paths:
+  /upload:
+    post:
+      summary: "Upload a file for processing"
+      description: "Allows the user to upload a PDF file, which will be processed asynchronously. Returns a unique task ID."
+      consumes:
+        - "multipart/form-data"
+      produces:
+        - "application/json"
+      parameters:
+        - in: "formData"
+          name: "file"
+          type: "file"
+          required: true
+          description: "The PDF file to upload."
+      responses:
+        202:
+          description: "File successfully uploaded. Task created."
+          schema:
+            type: "object"
+            properties:
+              message:
+                type: "string"
+              id:
+                type: "string"
+        400:
+          description: "Bad request. No file provided or file not selected."
+          schema:
+            type: "object"
+            properties:
+              description:
+                type: "string"
+  /status/{task_id}:
+    get:
+      summary: "Get the status of a file processing task"
+      description: "Checks the status of a file processing task by task ID. Returns the status and any associated data or errors."
+      produces:
+        - "application/json"
+      parameters:
+        - in: "path"
+          name: "task_id"
+          type: "string"
+          required: true
+          description: "The unique ID of the task to check."
+      responses:
+        200:
+          description: "Task found and its status returned."
+          schema:
+            type: "object"
+            properties:
+              status:
+                type: "string"
+              data:
+                type: "object"
+                additionalProperties:
+                  type: "array"
+                  items:
+                    type: "object"
+        404:
+          description: "Task not found or no files associated with the task."
+          schema:
+            type: "object"
+            properties:
+              status:
+                type: "string"
+              error:
+                type: "string"
+        500:
+          description: "Unexpected server error."
