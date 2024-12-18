@@ -40,25 +40,18 @@ Before you start, make sure you have the following tools installed:
 4. Access the Application:
    Open your browser and navigate to: http://127.0.0.1:5001/swagger/.
    The Flask app will be running on port 5001 by default.
-   
-5. Run the Celery Worker: 
-   In a separate terminal window, start the Celery worker to process background tasks:
 
-   ```bash
-   docker-compose run celery
-   ```
 
 This ensures that tasks submitted by the Flask app are processed asynchronously.
 
-6.Testing the API: Use tools like Postman to test the API endpoints. Example:
+5.Testing the API: Use tools like Postman to test the API endpoints. Example:
    ```bash
       POST http://localhost:5001/upload
       GET http://localhost:5001/status/{task_id}
    ```
 
 
-
-7.Stop the Containers: To stop and remove all running containers:
+6.Stop the Containers: To stop and remove all running containers:
    ```bash
       docker-compose down
    ```
